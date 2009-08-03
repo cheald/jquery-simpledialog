@@ -10,7 +10,7 @@
  * Since  : 0.01 - 07/06/2009
  * Version: 0.10 - 07/19/2009
  */
-(function(jQuery) {
+(function($) {
 
   // Private Variables
 
@@ -30,69 +30,66 @@
     _content = null;
 
   // Public Methods
-
-  jQuery.fn.simpleDialog = function (options) {
-    var opts = jQuery.extend({}, $.fn.simpleDialog.defaults, options);
+  $.fn.simpleDialog = function (options) {
+    var opts = $.extend({}, $.fn.simpleDialog.defaults, options);
 
     return this.each(function(i, e) {
-      var $this = jQuery(e);
+      if(e._sd) return;
+      e._sd = true;
+      var $this = $(e);
       var triggerEvent = ($this.is('form')) ? 'submit': 'click';
+      e.clickBinding = triggerEvent;
 
-      $this
-        .bind(triggerEvent + '.simpledialog', function (event) {
-          event.preventDefault();
+      $this.bind(triggerEvent + '.simpledialog', function (event) {
+        
+        event.preventDefault();
 
-          _t = this;
-          _t.opts = opts;
-          _event = event;
+        _t = this;
+        _t.opts = opts;
+        _event = event;
 
-          _initialize();
+        _initialize(); _prepare();
 
-          // show overlay
-          _prepare();
+        var $t = $(this);
 
-          var $t = jQuery(this);
+        if (_t.opts.title != '')
+          _title = _t.opts.title;
 
-          if (_t.opts.title != '')
-            _title = _t.opts.title;
-
-          if ($t.is('a')) {
-            if (_t.opts.useTitleAttr) {
-              var title = $t.attr('title');
-              if (typeof title != 'undefined' && title != '')
-                _title = title;
-            }
-
-            var href = $t.attr('href');
-
-            if (href.match(/^#/)) {
-              var c = jQuery('#' + $t.attr('rel'));
-              if (c.length == 0) return false;
-              _target = c;
-              _escapedContent = _target.clone().html();
-              _target.empty();
-              _show(_escapedContent);
-            } else if ($t.find('img').length > 0) {
-              if (_t.opts.showCaption)
-                _caption = $t.find('img').attr('title');
-              _load(href);
-            } else {
-              _request(href, {});
-            }
-          } else if ($t.is(':submit', ':button')) {
-            var f = $t.parents('form');
-            _request(f.attr('action'), f.serialize(), f.attr('method'));
-          } else if ($t.is('form')) {
-            _request($t.attr('action'), $t.serialize(), $t.attr('method'));
-          } else {
-            jQuery.simpleDialog.close(event);
+        if ($t.is('a')) {
+          if (_t.opts.useTitleAttr) {
+            var title = $t.attr('title');
+            if (typeof title != 'undefined' && title != '') _title = title;
           }
-          return false;
-        });
+
+          var href = $t.attr('href');
+          if (href.match(/^#/)) {
+            var c = $('#' + $t.attr('rel'));
+            if (c.length == 0) return false;
+            _target = c;
+            _escapedContent = _target.clone().html();
+            _target.empty();
+            _show(_escapedContent);
+          } else if ($t.find('img').length > 0) {
+            if (_t.opts.showCaption)
+              _caption = $t.find('img').attr('title');
+            _load(href);
+          } else {
+            _request(href, {});
+          }
+        } else if ($t.is(':submit', ':button')) {
+          var f = $t.parents('form');
+          _request(f.attr('action'), f.serialize(), f.attr('method'));
+        } else if ($t.is('form')) {
+          _request($t.attr('action'), $t.serialize(), $t.attr('method'));
+        } else {
+          $.simpleDialog.close(event);
+        }
+        return false;
+      });
     });
   };
 
-  jQuery.fn.simpleDialog.defaults = {
+  $.fn.simpleDialog.defaults = {
     title: '',
     useTitleAttr: true,
     containerId: 'sd_container',
@@ -115,15 +112,17 @@
     closeSelector: '.close'
   };
 
-  jQuery.simpleDialog = {
-    close: function (event) {
+  $.simpleDialog = {
+    close: function (event, except) {
       if (_container != null)
         _container.remove();
       if (_target != null)
         _target.html(_escapedContent);
       if ($.isFunction(_t.opts.close))
         _t.opts.close.apply(this, [(typeof event == 'undefined') ? null: event, _t]);
-      jQuery('#' + _t.opts.overlayId).remove();
+      if(!(except && except.overlay)) { 
+        $('#' + _t.opts.overlayId).remove();
+      }
       return false;
     }
   };
@@ -131,8 +130,8 @@
   // Private Methods
 
   var _initialize = function () {
-    _doc = jQuery(document);
-    _win = jQuery(window);
+    _doc = _doc || $(document);
+    _win = _win || $(window);
     _docHeight = _doc.height();
     _winHeight = _win.height();
     _winWidth = _win.width();
@@ -151,7 +150,7 @@
     if (_caption != '' && typeof _caption != 'undefined')
       body += ' <div class="sd_footer">' + _caption + '</div>';
 
-    var tmp = jQuery('<div />')
+    var tmp = $('<div />')
       .addClass(_t.opts.containerClass)
       .hide()
       .css({
@@ -162,11 +161,9 @@
       .appendTo(document.body);
 
     var w = (_t.opts.width) ? parseInt(_t.opts.width) : tmp.width();
-    //var h = (_t.opts.height) ? parseInt(_t.opts.height): tmp.outerHeight(true) + parseInt(tmp.css('line-height'));
     var h = (_t.opts.height) ? parseInt(_t.opts.height) : tmp.height();
-    tmp.remove();
+    
     var pos = _center(w, h);
-
     _container
       .removeClass(_t.opts.loadingClass)
       .animate({
@@ -175,38 +172,25 @@
         left: pos[0] + 'px',
         top: pos[1] + 'px'
       }, _t.opts.duration, _t.opts.easing, function() {
+        tmp.removeClass(_t.opts.containerClass).css({position: 'relative'}).appendTo(_container).show();
         _container
-          .html(body)
           .find(_t.opts.closeSelector)
-          .bind('click.simpledialog', jQuery.simpleDialog.close);
+          .bind('click.simpledialog', $.simpleDialog.close);
 
         if (_t.opts.showCloseLabel) {
           var sc = '<div id="sd_closelabel" class="' + _t.opts.closeLabelClass + '">' +
             '<a href="#">' + _t.opts.closeLabel + '</a></div>';
-
-          _container.hover(
-            function () {
-              $(this).append(sc);
-              var scObj = $('#sd_closelabel');
-              scObj
-                .css({
-                  position: 'absolute',
-                  top: 0,
-                  left: (w-scObj.width()) + 'px',
-                  opacity: 0.85
-                })
-                .find('a').click(jQuery.simpleDialog.close);
-            },
-            function () { $('#sd_closelabel').remove() });
+          _container.append(sc);
+          _container.find("#sd_closelabel a").bind("click.simpledialog", $.simpleDialog.close);
         }
 
-        if (jQuery.isFunction(_t.opts.open))
+        if ($.isFunction(_t.opts.open))
           _t.opts.open.apply(_container, [_event, _t]);
       });
   };
-
+  
   var _request = function (url, data, method) {
-    jQuery.ajax({
+    $.ajax({
       type: (typeof method == 'undefined') ? 'GET': method,
       url: url,
       data: data,
@@ -233,23 +217,26 @@
   };
 
   var _prepare = function () {
-
+    $.simpleDialog.close(null, {overlay: true});
     // overlay
-    jQuery('<div />')
-      .attr('id', _t.opts.overlayId)
-      .addClass(_t.opts.overlayClass)
-      .css({
-        position: 'absolute',
-        width: _winWidth,
-        height: _docHeight,
-        opacity: _t.opts.opacity,
-        zIndex: _t.opts.zIndex
-      })
-      .bind('click.simpledialog', jQuery.simpleDialog.close)
-      .appendTo(document.body);
+    var overlay = $("#" + _t.opts.overlayClass);
+    if(overlay.length == 0) {
+      $('<div />')
+        .attr('id', _t.opts.overlayId)
+        .addClass(_t.opts.overlayClass)
+        .css({
+          position: 'absolute',
+          width: _winWidth,
+          height: _docHeight,
+          opacity: _t.opts.opacity,
+          zIndex: _t.opts.zIndex
+        })
+        .bind('click.simpledialog', $.simpleDialog.close)
+        .appendTo(document.body).css({opacity: 0}).animate({opacity: 0.9});
+    }
 
     // container
-    _container = jQuery('<div />')
+    _container = $('<div />')
       .attr('id', _t.opts.containerId)
       .addClass(_t.opts.loadingClass)
       .addClass(_t.opts.containerClass)
