@@ -33,7 +33,7 @@
   $.fn.simpleDialog = function (options) {
     var opts = $.extend({}, $.fn.simpleDialog.defaults, options);
 
-    return this.each(function(i, e) {
+    return $(this).each(function(i, e) {
       if(e._sd) return;
       e._sd = true;
       var $this = $(e);
@@ -102,6 +102,7 @@
     closeLabel: 'close &times;',
     opacity: 0.6,
     duration: 400,
+    closeDuration: 250,
     easing: 'linear',
     zIndex: 1000,
     width: null,
@@ -114,14 +115,16 @@
 
   $.simpleDialog = {
     close: function (event, except) {
-      if (_container != null)
-        _container.remove();
       if (_target != null)
         _target.html(_escapedContent);
       if ($.isFunction(_t.opts.close))
         _t.opts.close.apply(this, [(typeof event == 'undefined') ? null: event, _t]);
-      if(!(except && except.overlay)) { 
-        $('#' + _t.opts.overlayId).remove();
+      if(!except) { 
+        if (_container != null)
+          _container.remove();
+        $('#' + _t.opts.overlayId).animate({opacity: 0}, _t.opts.closeDuration, null, function() {
+          $(this).remove();
+        });
       }
       return false;
     }
@@ -188,6 +191,13 @@
           _t.opts.open.apply(_container, [_event, _t]);
       });
   };
+  $.simpleDialogManual = function(options) {
+    var opts = $.extend({}, $.fn.simpleDialog.defaults, options);
+    _t = {opts: opts}
+    _initialize(); _prepare(); 
+    _title = options.title || '';
+    _show(options.content);
+  }
   
   var _request = function (url, data, method) {
     $.ajax({
@@ -217,7 +227,7 @@
   };
 
   var _prepare = function () {
-    $.simpleDialog.close(null, {overlay: true});
+    $.simpleDialog.close(null, true);
     // overlay
     var overlay = $("#" + _t.opts.overlayClass);
     if(overlay.length == 0) {
@@ -232,30 +242,36 @@
           zIndex: _t.opts.zIndex
         })
         .bind('click.simpledialog', $.simpleDialog.close)
-        .appendTo(document.body).css({opacity: 0}).animate({opacity: 0.9});
+        .appendTo(document.body);
     }
 
     // container
-    _container = $('<div />')
-      .attr('id', _t.opts.containerId)
-      .addClass(_t.opts.loadingClass)
-      .addClass(_t.opts.containerClass)
-      .hide()
-      .appendTo(document.body);
+    var containers = $("#" + _t.opts.containerId);
+    if(containers.length == 0) {
+      _container = $('<div />')
+        .attr('id', _t.opts.containerId)
+        .addClass(_t.opts.loadingClass)
+        .addClass(_t.opts.containerClass)
+        .hide()
+        .appendTo(document.body);
 
-    var w = _container.width();
-    var h = _container.height();
-    var pos = _center(w, h);
-    _container
-      .css({
-        position: 'absolute',
-        left: pos[0] + 'px',
-        top: pos[1] + 'px',
-        width: w + 'px',
-        height: h + 'px',
-        zIndex: _t.opts.zIndex + 1000
-      })
-      .show();
+      var w = _container.width();
+      var h = _container.height();
+      var pos = _center(w, h);
+      
+      _container
+        .css({
+          position: 'absolute',
+          left: pos[0] + 'px',
+          top: pos[1] + 'px',
+          width: w + 'px',
+          height: h + 'px',
+          zIndex: _t.opts.zIndex + 1000
+        })
+        .show();
+    } else {
+      containers.empty().removeClass().addClass(_t.opts.loadingClass).addClass(_t.opts.containerClass);
+    }
   };
 
   var _center = function (w, h) {
